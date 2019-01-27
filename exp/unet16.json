@@ -1,0 +1,44 @@
+{
+    "seed" : 2017,
+    "save_path" : "/deep/group/awni/speech_models/test",
+
+    "data" : {
+        "train_set" : "/deep/group/speech/datasets/LibriSpeech/train-toy.json",
+        "dev_set" : "/deep/group/speech/datasets/LibriSpeech/dev-toy.json"
+    },
+
+    "optimizer" : {
+        "batch_size" : 8,
+        "epochs" : 1000,
+        "learning_rate" : 1e-3,
+        "momentum" : 0.0
+    },
+
+    "model" : {
+        "leaky_slope" : 0.1,
+        "ratio_mask" : "BDT",
+        "encoders" : [
+            [1, 32, [7, 5], [2, 2], [3, 2]],
+            [32, 32, [7, 5], [2, 1], [3, 2]],
+            [32, 64, [7, 5], [2, 2], [3, 2]],
+            [64, 64, [5, 3], [2, 1], [2, 1]],
+            [64, 64, [5, 3], [2, 2], [2, 1]],
+            [64, 64, [5, 3], [2, 1], [2, 1]],
+            [64, 64, [5, 3], [2, 2], [2, 1]],
+            [64, 64, [5, 3], [2, 1], [2, 1]]
+        ],
+        "decoders" : [
+            [64, 64, [5, 3], [2, 1], [2, 1]],
+            [128, 64, [5, 3], [2, 2], [2, 1]],
+            [128, 64, [5, 3], [2, 1], [2, 1]],
+            [128, 64, [5, 3], [2, 2], [2, 1]],
+            [128, 64, [5, 3], [2, 1], [2, 1]],
+            [128, 32, [7, 5], [2, 2], [3, 2]],
+            [64, 32, [7, 5], [2, 1], [3, 2]],
+            [64, 1, [7, 5], [2, 2], [3, 2]]
+        ],
+        "__coder_keys" : [
+            "in_channels", "out_channels", "kernel_size", "stride", "padding"
+        ]
+    }
+}

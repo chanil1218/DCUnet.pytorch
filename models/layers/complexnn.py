@@ -224,8 +224,3 @@ class ComplexBatchNorm(torch.nn.Module):
     def extra_repr(self):
         return '{num_features}, eps={eps}, momentum={momentum}, affine={affine}, ' \
                 'track_running_stats={track_running_stats}'.format(**self.__dict__)
-
-    def _load_from_state_dict(self, state_dict, prefix, strict, missing_keys,
-            unexpected_keys, error_msgs):
-        super(ComplexBatchNorm, self)._load_from_state_dict(state_dict,
-                prefix, strict, missing_keys, unexpected_keys, error_msgs)

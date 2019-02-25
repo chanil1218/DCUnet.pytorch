@@ -14,15 +14,10 @@ from tqdm import tqdm
 
 import utils
 from models.unet import Unet
-from models.layers.stft import STFT
+from models.layers.istft import ISTFT
 from se_dataset import AudioDataset
 from torch.utils.data import DataLoader
 
-# NOTE - Use window not supporting stft until pytorch implements istft
-#  > https://github.com/pytorch/pytorch/issues/3775
-stft_module = STFT().cuda()
-stft = stft_module.transform
-istft = stft_module.inverse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_dir', default='experiments/base_model', help="Directory containing params.json")
@@ -30,6 +25,11 @@ parser.add_argument('--restore_file', default=None, help="Optional, name of the 
 parser.add_argument('--batch_size', default=32, type=int, help='train batch size')
 parser.add_argument('--num_epochs', default=100, type=int, help='train epochs number')
 args = parser.parse_args()
+
+n_fft, hop_length = 400, 160
+window = torch.hann_window(n_fft).cuda()
+stft = lambda x: torch.stft(x, n_fft, hop_length, window=window)
+istft = ISTFT(n_fft, hop_length, window='hanning').cuda()
 
 def wSDRLoss(mixed, clean, clean_est, eps=2e-7):
     # Used on signal level(time-domain). Backprop-able istft should be used.
@@ -84,11 +84,11 @@ def main():
         train_bar = tqdm(train_data_loader)
         for input in train_bar:
             train_mixed, train_clean, seq_len = map(lambda x: x.cuda(), input)
-            mag, phase = stft(train_mixed)
-            mag, phase = mag.unsqueeze(dim=1), phase.unsqueeze(dim=1)
-            out_mag, out_phase = net(mag, phase)
-            out_mag, out_phase = torch.squeeze(out_mag, 1), torch.squeeze(out_phase, 1)
-            out_audio = istft(out_mag, out_phase)
+            mixed = stft(train_mixed).unsqueeze(dim=1)
+            real, imag = mixed[..., 0], mixed[..., 1]
+            out_real, out_imag = net(real, imag)
+            out_real, out_imag = torch.squeeze(out_real, 1), torch.squeeze(out_imag, 1)
+            out_audio = istft(out_real, out_imag, train_mixed.size(1))
             out_audio = torch.squeeze(out_audio, dim=1)
             for i, l in enumerate(seq_len):
                 out_audio[i, l:] = 0

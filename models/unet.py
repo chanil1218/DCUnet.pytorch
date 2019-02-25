@@ -62,16 +62,31 @@ class Unet(nn.Module):
         self.last_decoder = dcnn.ComplexConvWrapper(nn.ConvTranspose2d,
                 *cfg['decoders'][-1], bias=True)
 
-        if cfg['ratio_mask'] == 'BDT':
-            # TODO - This is harder(much longer) to train than BDSS, Check phase difference(check bound of phase mask, in paper handle complex number, we use real imaginary number separately).
-            # NOTE - Not guaranteed to work properly yet.
-            # M_mag = tanh(|O|), M_phase = O / |O| for O = g(X)
-            self.ratio_mask = lambda r, i: (torch.tanh(torch.abs(r)),
-                    i / (torch.abs(r) + 1e-7))
-        elif cfg['ratio_mask'] == 'BDSS':
-            self.ratio_mask = lambda r, i: (torch.sigmoid(r), torch.sigmoid(i))
-        elif cfg['ratio_mask'] == 'UBD':
-            self.ratio_mask = lambda r, i: (r, i)
+        self.ratio_mask_type = cfg['ratio_mask']
+
+    def get_ratio_mask(self, outr, outi):
+        def inner_fn(r, i):
+            if self.ratio_mask_type == 'BDSS':
+                return torch.sigmoid(outr) * r, torch.sigmoid(outi) * i
+            else:
+                # Polar cordinate masks
+                # x1.4 slower
+                mag_mask = torch.sqrt(outr**2 + outi**2)
+                # M_phase = O/|O| for O = g(X)
+                # Same phase rotate(theta), for phase mask O/|O| and O.
+                phase_rotate = torch.atan2(outi, outr)
+
+                if self.ratio_mask_type == 'BDT':
+                    mag_mask = torch.tanh(mag_mask)
+                # else then UBD(Unbounded)
+
+                mag = mag_mask * torch.sqrt(r**2 + i**2)
+                phase = phase_rotate + torch.atan2(i, r)
+
+                # return real, imag
+                return mag * torch.cos(phase), mag * torch.sin(phase)
+
+        return inner_fn
 
     def forward(self, xr, xi):
         input_real, input_imag = xr, xi
@@ -91,7 +106,5 @@ class Unet(nn.Module):
         xr, xi = self.last_decoder(xr, xi)
 
         xr, xi = pad2d_as(xr, input_real), pad2d_as(xi, input_imag)
-        xr, xi = self.ratio_mask(xr, xi)
-        xr, xi = xr * input_real, xi * input_imag
-
-        return xr, xi
+        ratio_mask_fn = self.get_ratio_mask(xr, xi)
+        return ratio_mask_fn(input_real, input_imag)
